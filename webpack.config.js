@@ -1,5 +1,5 @@
 module.exports = {
-    entry: './src/js/fundamentals.js',
+    entry: './src/js/solarsystem.js',
     performance: {
         hints: false
     },

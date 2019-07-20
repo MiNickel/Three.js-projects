@@ -4,13 +4,22 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 var scene, camera, renderer;
 var objects = [];
 
+const earthDistance = 14.96;
+const moonDistanceFromEarth = 0.03844;
+const mercuryDistance = 5.791;
+const sunSize = 25;
+const earthSize = sunSize / 109;
+const moonSize = earthSize / 3.7;
+const mercurySize = earthSize / 2.6235;
+
 function init() {
     const canvas = document.getElementById("can");
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xaaaaaa);
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 10;
+    camera.position.z = 80;
+    camera.lookAt(0, 0, 0);
 
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -19,15 +28,35 @@ function init() {
     window.addEventListener("resize", onResize, false);
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const sphereGeometry = new THREE.SphereBufferGeometry(1, 24, 24);
 
-    addSolidGeometry(0, 0, geometry);
-    addSolidGeometry(2, 0, geometry);
-    addSolidGeometry(-2, 0, geometry);
-    createText();
-    addLineGeometry(4, 0, new THREE.EdgesGeometry(geometry));
+    const solarSystem = new THREE.Object3D();
+    const earthOrbit = new THREE.Object3D();
+    const marsOrbit = new THREE.Object3D();
+    earthOrbit.position.x = sunSize + earthDistance;
+    scene.add(solarSystem);
+    solarSystem.add(earthOrbit);
+    solarSystem.add(marsOrbit);
+    objects.push(solarSystem);
+    objects.push(earthOrbit);
+    objects.push(marsOrbit);
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(-1, 2, 4);
+
+
+    const sun = addSolidGeometry(0, 0, sphereGeometry, 0xffff00, solarSystem);
+    sun.scale.set(25, 25, 25);
+    sun.material.emissive = new THREE.Color(0xffff00);
+
+    const mercury = addSolidGeometry(sunSize + mercuryDistance, 0, sphereGeometry, 0xD3D3D3, solarSystem);
+    mercury.scale.set(mercurySize, mercurySize, mercurySize);
+
+    const earth = addSolidGeometry(0, 0, sphereGeometry, 0x2233ff, earthOrbit);
+    earth.scale.set(earthSize, earthSize, earthSize);
+
+    const moon = addSolidGeometry(earthSize + moonDistanceFromEarth, 0, sphereGeometry, 0x888888, earthOrbit);
+    moon.scale.set(moonSize, moonSize, moonSize);
+
+    const light = new THREE.PointLight(0xffffff, 1);
     scene.add(light);
 
 }
@@ -37,13 +66,9 @@ function animate() {
     requestAnimationFrame(animate);
 
     objects.forEach((object, index) => {
-
-        const speed = 1 + index * .1;
-        const rot = 0.01 * speed;
-        object.rotation.x += rot;
-        object.rotation.y += rot;
-
+        object.rotation.y += 0.003;
     });
+
     renderer.render(scene, camera);
 
 }
@@ -56,35 +81,40 @@ function onResize() {
 
 }
 
-function addObject(x, y, obj) {
+function addObject(x, y, obj, addToScene) {
 
     obj.position.x = x;
     obj.position.y = y;
 
-    scene.add(obj);
+    addToScene.add(obj);
     objects.push(obj);
 
     return obj;
 
 }
 
-function createMaterial() {
+function createMaterial(matColor) {
 
     const material = new THREE.MeshPhongMaterial({ side: THREE.DoubleSide });
 
-    const hue = Math.random();
-    const saturation = 1;
-    const luminace = 0.5;
-    material.color.setHSL(hue, saturation, luminace);
+    if (typeof matColor === "undefined") {
+        const hue = Math.random();
+        const saturation = 1;
+        const luminace = 0.5;
+        material.color.setHSL(hue, saturation, luminace);
+    } else {
+        material.color.setHex(matColor);
+    }
 
     return material;
 
 }
 
-function addSolidGeometry(x, y, geometry) {
+function addSolidGeometry(x, y, geometry, color, addToScene) {
 
-    const mesh = new THREE.Mesh(geometry, createMaterial());
-    addObject(x, y, mesh);
+    const mesh = new THREE.Mesh(geometry, createMaterial(color));
+
+    return addObject(x, y, mesh, addToScene);
 
 }
 
