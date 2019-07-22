@@ -1,29 +1,46 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import * as dat from 'dat.gui';
 
-var scene, camera, renderer;
+const gui = new dat.GUI();
+
+var scene, camera, renderer, earthCamera;
 var objects = [];
 
-const earthDistance = 14.96;
-const moonDistanceFromEarth = 0.03844;
-const mercuryDistance = 5.791;
+const earthDistance = 2690.6475;
+const moonDistanceFromEarth = 6.8643;
+const mercuryDistance = 1041.5468;
 const sunSize = 25;
 const earthSize = sunSize / 109;
 const moonSize = earthSize / 3.7;
 const mercurySize = earthSize / 2.6235;
 
+var textureLoader = new THREE.TextureLoader();
+
 function init() {
     const canvas = document.getElementById("can");
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xaaaaaa);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 80;
-    camera.lookAt(0, 0, 0);
+    scene.background = textureLoader.load("../textures/star-field.png");
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
+    earthCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
+    earthCamera.position.set(0, 35, 35);
 
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
+
+    var controls = new OrbitControls(camera, renderer.domElement);
+
+    camera.position.z = 1300;
+    //camera.position.y = 1000;
+    controls.update();
+    camera.lookAt(0, 0, 0);
+    controls.update();
+
+    var cameraPos = {
+        start: false,
+    };
 
     window.addEventListener("resize", onResize, false);
 
@@ -40,24 +57,141 @@ function init() {
     objects.push(solarSystem);
     objects.push(earthOrbit);
     objects.push(marsOrbit);
+    earthOrbit.add(earthCamera);
 
 
 
-    const sun = addSolidGeometry(0, 0, sphereGeometry, 0xffff00, solarSystem);
-    sun.scale.set(25, 25, 25);
-    sun.material.emissive = new THREE.Color(0xffff00);
+    const sun = addSphereObject({
+        size: sunSize,
+        textures: {
+            map: "../textures/Map_of_the_full_sun.jpg",
+            emissiveMap: "../textures/Map_of_the_full_sun.jpg",
+            bumpMap: "../textures/Map_of_the_full_sun.jpg",
+        },
+        material: {
+            bumpScale: 0.5,
+            emissive: new THREE.Color(0xFF8C00),
+        },
+        position: {
+            x: 0,
+            y: 0,
+        },
+        addToScene: solarSystem,
+        name: "sun",
+    });
 
-    const mercury = addSolidGeometry(sunSize + mercuryDistance, 0, sphereGeometry, 0xD3D3D3, solarSystem);
-    mercury.scale.set(mercurySize, mercurySize, mercurySize);
+    const mercury = addSphereObject({
+        size: mercurySize + 20,
+        textures: {
+            map: "../textures/mercury_texture.jpg",
+            bumpMap: "../textures/mercury_texture.jpg",
+        },
+        material: {
+            bumpScale: 0.5,
+        },
+        position: {
+            x: sunSize + mercuryDistance,
+            y: 0,
+        },
+        addToScene: solarSystem,
+        name: "mercury",
+    });
 
-    const earth = addSolidGeometry(0, 0, sphereGeometry, 0x2233ff, earthOrbit);
+    const earth = addSphereObject({
+        size: earthSize + 20,
+        textures: {
+            map: "../textures/earthmap1k.jpg",
+            //emissiveMap: "../textures/earthmap1k.jpg",
+            bumpMap: "../textures/earthbump1k.jpg",
+        },
+        material: {
+            bumpScale: 0.5,
+        },
+        position: {
+            x: 0,
+            y: 0,
+        },
+        addToScene: earthOrbit,
+        name: "earth",
+    });
+
+    const moon = addSphereObject({
+        size: moonSize + 4,
+        textures: {
+            map: "../textures/moon_texture.jpg",
+            bumpMap: "../textures/moon_bump_map.jpg",
+        },
+        material: {
+            bumpScale: 0.5,
+        },
+        position: {
+            x: earthSize + 20 + moonDistanceFromEarth,
+            y: 0,
+        },
+        addToScene: earthOrbit,
+        name: "moon",
+    });
+
+    gui.add(cameraPos, "start").name("Erde").onChange(() => {
+        if (cameraPos.start) {
+            camera.position.set(2705, 0, 66);
+            //camera.lookAt(earth.position);
+        } else {
+            camera.position.set(0, 0, 1300);
+        }
+    });
+
+
+    /*const earth = addSolidGeometry(0, 0, sphereGeometry, 0x2233ff, earthOrbit);
     earth.scale.set(earthSize, earthSize, earthSize);
 
     const moon = addSolidGeometry(earthSize + moonDistanceFromEarth, 0, sphereGeometry, 0x888888, earthOrbit);
-    moon.scale.set(moonSize, moonSize, moonSize);
+    moon.scale.set(moonSize, moonSize, moonSize);*/
 
-    const light = new THREE.PointLight(0xffffff, 1);
-    scene.add(light);
+    const pointLight = new THREE.PointLight(0xffffff, 1.5);
+    scene.add(pointLight);
+
+}
+
+function addSphereObject(options) {
+
+    let object = new THREE.Mesh(createSphereGeometry(options.size), createSphereMaterial(options));
+    object.position.x = options.position.x;
+    object.position.y = options.position.y;
+    object.name = options.name;
+    options.addToScene.add(object);
+    objects.push(object);
+
+    return object;
+
+}
+
+function createSphereGeometry(size) {
+
+    let sphereGeometry = new THREE.SphereBufferGeometry(size, 24, 24);
+
+    return sphereGeometry;
+
+}
+
+function createSphereMaterial(options) {
+
+    let material = new THREE.MeshPhongMaterial();
+
+    for (let property in options.textures) {
+        textureLoader.load(options.textures[property], (texture) => {
+            material[property] = texture;
+            material.needsUpdate = true;
+        });
+    }
+
+    if (options.material) {
+        for (var property in options.material) {
+            material[property] = options.material[property];
+        }
+    }
+
+    return material;
 
 }
 
@@ -65,8 +199,8 @@ function animate() {
 
     requestAnimationFrame(animate);
 
-    objects.forEach((object, index) => {
-        object.rotation.y += 0.003;
+    objects.forEach((obj) => {
+        //obj.rotation.y += 0.006;
     });
 
     renderer.render(scene, camera);
@@ -93,9 +227,9 @@ function addObject(x, y, obj, addToScene) {
 
 }
 
-function createMaterial(matColor) {
+/*function createMaterial(matColor) {
 
-    const material = new THREE.MeshPhongMaterial({ side: THREE.DoubleSide });
+    const material = new THREE.MeshBasicMaterial({ map: sunTexture });
 
     if (typeof matColor === "undefined") {
         const hue = Math.random();
@@ -103,12 +237,12 @@ function createMaterial(matColor) {
         const luminace = 0.5;
         material.color.setHSL(hue, saturation, luminace);
     } else {
-        material.color.setHex(matColor);
+        //material.color.setHex(matColor);
     }
 
     return material;
 
-}
+}*/
 
 function addSolidGeometry(x, y, geometry, color, addToScene) {
 
