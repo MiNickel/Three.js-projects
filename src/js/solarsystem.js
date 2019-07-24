@@ -4,62 +4,79 @@ import * as dat from 'dat.gui';
 
 const gui = new dat.GUI();
 
-var scene, camera, renderer, earthCamera;
+var scene, camera, renderer, earthCamera, mercuryCamera, cameras, controls, cameraPos, earthOrbit, solarSystem, venusCamera;
 var objects = [];
 
-const earthDistance = 2690.6475;
+const earthDistance = 2645.683453;
 const moonDistanceFromEarth = 6.8643;
-const mercuryDistance = 1041.5468;
+const mercuryDistance = 1258.992806;
+const venusDistance = 1946.043165;
 const sunSize = 25;
 const earthSize = sunSize / 109;
 const moonSize = earthSize / 3.7;
 const mercurySize = earthSize / 2.6235;
+const venusSize = sunSize / 114.8417;
 
 var textureLoader = new THREE.TextureLoader();
 
 function init() {
+
     const canvas = document.getElementById("can");
 
     scene = new THREE.Scene();
     scene.background = textureLoader.load("../textures/star-field.png");
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 14000);
+    camera.position.z = 1600;
+    camera.lookAt(0, 0, 0);
+
     earthCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
-    earthCamera.position.set(0, 35, 35);
+    earthCamera.position.set(0, 0.3, 0.5);
+
+    mercuryCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
+    mercuryCamera.position.set(0, 0.2, 0.4);
+
+    venusCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 4000);
+    venusCamera.position.set(0, 0.5, 0.7);
 
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    var controls = new OrbitControls(camera, renderer.domElement);
+    const pointLight = new THREE.PointLight(0xffffff, 1.5);
+    scene.add(pointLight);
 
-    camera.position.z = 1300;
-    //camera.position.y = 1000;
-    controls.update();
-    camera.lookAt(0, 0, 0);
-    controls.update();
+    cameras = [
+        { cam: camera },
+        { cam: earthCamera },
+        { cam: mercuryCamera },
+        { cam: venusCamera },
+    ]
 
-    var cameraPos = {
-        start: false,
-    };
-
-    window.addEventListener("resize", onResize, false);
-
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const sphereGeometry = new THREE.SphereBufferGeometry(1, 24, 24);
-
-    const solarSystem = new THREE.Object3D();
-    const earthOrbit = new THREE.Object3D();
+    solarSystem = new THREE.Object3D();
+    earthOrbit = new THREE.Object3D();
+    const mercuryOrbit = new THREE.Object3D();
     const marsOrbit = new THREE.Object3D();
+    const venusOrbit = new THREE.Object3D();
+
     earthOrbit.position.x = sunSize + earthDistance;
+    mercuryOrbit.position.x = sunSize + mercuryDistance;
+    venusOrbit.position.x = sunSize + venusDistance;
     scene.add(solarSystem);
     solarSystem.add(earthOrbit);
+    solarSystem.add(mercuryOrbit);
     solarSystem.add(marsOrbit);
+    solarSystem.add(venusOrbit);
     objects.push(solarSystem);
     objects.push(earthOrbit);
+    objects.push(mercuryOrbit);
     objects.push(marsOrbit);
     earthOrbit.add(earthCamera);
-
-
+    mercuryOrbit.add(mercuryCamera);
+    venusOrbit.add(venusCamera);
+    earthCamera.lookAt(earthOrbit.position);
+    mercuryCamera.lookAt(mercuryOrbit.position);
+    venusCamera.lookAt(venusOrbit.position);
 
     const sun = addSphereObject({
         size: sunSize,
@@ -81,31 +98,49 @@ function init() {
     });
 
     const mercury = addSphereObject({
-        size: mercurySize + 20,
+        size: mercurySize,
         textures: {
             map: "../textures/mercury_texture.jpg",
             bumpMap: "../textures/mercury_texture.jpg",
         },
         material: {
-            bumpScale: 0.5,
+            bumpScale: 0.01,
         },
         position: {
-            x: sunSize + mercuryDistance,
+            x: 0,
             y: 0,
         },
-        addToScene: solarSystem,
+        addToScene: mercuryOrbit,
         name: "mercury",
     });
 
+    const venus = addSphereObject({
+        size: venusSize,
+        textures: {
+            map: "../textures/venus_surface.jpg",
+            emissiveMap: "../textures/venus_surface.jpg",
+        },
+        material: {
+            emissive: new THREE.Color(0xffffff),
+            emissiveIntensity: 0.4,
+        },
+        position: {
+            x: 0,
+            y: 0,
+        },
+        addToScene: venusOrbit,
+        name: "venus",
+    })
+
     const earth = addSphereObject({
-        size: earthSize + 20,
+        size: earthSize,
         textures: {
             map: "../textures/earthmap1k.jpg",
             //emissiveMap: "../textures/earthmap1k.jpg",
             bumpMap: "../textures/earthbump1k.jpg",
         },
         material: {
-            bumpScale: 0.5,
+            bumpScale: 0.1,
         },
         position: {
             x: 0,
@@ -116,40 +151,98 @@ function init() {
     });
 
     const moon = addSphereObject({
-        size: moonSize + 4,
+        size: moonSize,
         textures: {
             map: "../textures/moon_texture.jpg",
             bumpMap: "../textures/moon_bump_map.jpg",
         },
         material: {
-            bumpScale: 0.5,
+            bumpScale: 0.1,
         },
         position: {
-            x: earthSize + 20 + moonDistanceFromEarth,
+            x: earthSize + moonDistanceFromEarth,
             y: 0,
         },
         addToScene: earthOrbit,
         name: "moon",
     });
 
-    gui.add(cameraPos, "start").name("Erde").onChange(() => {
-        if (cameraPos.start) {
-            camera.position.set(2705, 0, 66);
-            //camera.lookAt(earth.position);
-        } else {
-            camera.position.set(0, 0, 1300);
-        }
+    createOrbit(2670.683453, 2760.611511); // Erde
+    createOrbit(1283.992806, 870.323741); // Merkur
+    createOrbit(venusDistance + 25, 1935.251799 + 25); // Venus
+
+    camera = cameras[0];
+    controls = new OrbitControls(camera.cam, renderer.domElement);
+    controls.update();
+
+    cameraPos = {
+        earth: () => {
+            camera = cameras[1];
+
+            controls.update();
+        },
+        start: () => {
+            camera = cameras[0];
+
+            controls.update();
+        },
+        mercury: () => {
+            camera = cameras[2];
+
+            controls.update();
+        },
+        venus: () => {
+            camera = cameras[3];
+
+            controls.update();
+        },
+    };
+
+    gui.add(cameraPos, "start").name("Start");
+
+    var f1 = gui.addFolder("Erde");
+    f1.add(cameraPos, "earth").name("zeige die Erde");
+
+    var f2 = gui.addFolder("Merkur");
+    f2.add(cameraPos, "mercury").name("zeige den Merkur");
+
+    var f3 = gui.addFolder("Venus");
+    f3.add(cameraPos, "venus").name("zeige die Venus");
+
+    console.log($("li.title").html());
+
+    var test = document.createElement("li");
+    test.innerHTML = "Alter: 4,6 Milliarden Jahre";
+    var test2 = document.createElement("li");
+    test2.innerHTML = "Durchmesser: 12.700 Kilometer";
+    f1.domElement.getElementsByTagName("ul")[0].appendChild(test);
+    f1.domElement.getElementsByTagName("ul")[0].appendChild(test2);
+
+    window.addEventListener("resize", onResize, false);
+
+}
+
+function animate() {
+
+    requestAnimationFrame(animate);
+
+    objects.forEach((obj) => {
+        if (obj.name == "earth") obj.rotation.y += 0.01;
     });
 
+    renderer.render(scene, camera.cam);
 
-    /*const earth = addSolidGeometry(0, 0, sphereGeometry, 0x2233ff, earthOrbit);
-    earth.scale.set(earthSize, earthSize, earthSize);
+}
 
-    const moon = addSolidGeometry(earthSize + moonDistanceFromEarth, 0, sphereGeometry, 0x888888, earthOrbit);
-    moon.scale.set(moonSize, moonSize, moonSize);*/
+function onResize() {
 
-    const pointLight = new THREE.PointLight(0xffffff, 1.5);
-    scene.add(pointLight);
+    cameras.forEach((camObject) => {
+        const camera = camObject.cam;
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+    });
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
 
 }
 
@@ -195,100 +288,23 @@ function createSphereMaterial(options) {
 
 }
 
-function animate() {
+function createOrbit(x, y) {
 
-    requestAnimationFrame(animate);
+    const curve = new THREE.EllipseCurve(
+        0, 0,
+        x, y,//2670.683453, 2760.611511,
+        0, 2 * Math.PI,
+        false,
+        0
+    );
 
-    objects.forEach((obj) => {
-        //obj.rotation.y += 0.006;
-    });
+    const points = curve.getPoints(1000);
+    const curveGeometry = new THREE.BufferGeometry().setFromPoints(points);
+    const curveMaterial = new THREE.LineBasicMaterial({ color: 0x5e5e5e });
 
-    renderer.render(scene, camera);
-
-}
-
-function onResize() {
-
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-
-}
-
-function addObject(x, y, obj, addToScene) {
-
-    obj.position.x = x;
-    obj.position.y = y;
-
-    addToScene.add(obj);
-    objects.push(obj);
-
-    return obj;
-
-}
-
-/*function createMaterial(matColor) {
-
-    const material = new THREE.MeshBasicMaterial({ map: sunTexture });
-
-    if (typeof matColor === "undefined") {
-        const hue = Math.random();
-        const saturation = 1;
-        const luminace = 0.5;
-        material.color.setHSL(hue, saturation, luminace);
-    } else {
-        //material.color.setHex(matColor);
-    }
-
-    return material;
-
-}*/
-
-function addSolidGeometry(x, y, geometry, color, addToScene) {
-
-    const mesh = new THREE.Mesh(geometry, createMaterial(color));
-
-    return addObject(x, y, mesh, addToScene);
-
-}
-
-function createText() {
-
-    const loader = new THREE.FontLoader();
-    loader.load("../TrueLiesRegular.json", (font) => {
-
-        const geometry = new THREE.TextBufferGeometry('Oof', {
-
-            font: font,
-            size: 2,
-            height: .2,
-            curveSegments: 12,
-            bevelEnabled: true,
-            bevelThickness: 0.15,
-            bevelSize: .3,
-            bevelOffset: 0,
-            bevelSegments: 5
-
-        });
-
-        const mesh = new THREE.Mesh(geometry, createMaterial());
-        geometry.computeBoundingBox();
-        geometry.boundingBox.getCenter(mesh.position).multiplyScalar(-1);
-
-        const parent = new THREE.Object3D();
-        parent.add(mesh);
-
-        addObject(0, 4, parent);
-
-    });
-
-}
-
-function addLineGeometry(x, y, geometry) {
-
-    const material = new THREE.LineBasicMaterial({ color: 0x000000 });
-    const mesh = new THREE.LineSegments(geometry, material);
-    addObject(x, y, mesh);
+    const ellipse = new THREE.Line(curveGeometry, curveMaterial);
+    ellipse.rotateX(90);
+    scene.add(ellipse);
 
 }
 
